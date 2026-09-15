@@ -86,7 +86,7 @@ jobs:
         run: |
           RESULT="${{ needs.optimize-defconfig.result }}"
           ICON=$([ "$RESULT" == "success" ] && echo "✅" || echo "❌")
-          MESSAGE=$(printf '%s <b>HMP Defconfig Optimization</b>\n\n📱 <b>Target:</b> <code>%s</code>\n🌿 <b>Branch:</b> <code>%s</code>' "$ICON" "${{ env.DEFCONFIG_NAME }}" "${{ env.BRANCH }}")
+          MESSAGE=$(printf '%s <b>Predator-Stormbreaker Defconfig Optimization</b>\n\n📱 <b>Target:</b> <code>%s</code>\n🌿 <b>Branch:</b> <code>%s</code>' "$ICON" "${{ env.DEFCONFIG_NAME }}" "${{ env.BRANCH }}")
           
           curl -s -X POST "https://api.telegram.org/bot${{ env.BOT_API }}/sendMessage" \
             -F chat_id="${{ env.TELEGRAM_GROUP_ID }}" \
