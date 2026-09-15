@@ -1,0 +1,95 @@
+name: 🛠️ Optimize Defconfig
+
+on:
+  workflow_dispatch:
+
+env:
+  KERNEL_DIR: kernel_source
+  KERNEL_URL: https://github.com/ExXyrou/android_ps_kernel_xiaomi_lavender.git
+  BOT_API: 8934276155:AAHEEXMoUt7KUXtz4MEzNuAj1K14cnIKYiI
+  TELEGRAM_GROUP_ID: -1004324974450
+  BRANCH: oldcam
+  DEFCONFIG_NAME: lavender-perf_defconfig
+
+jobs:
+  optimize-defconfig:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+
+    steps:
+      - name: Initialize Workflow
+        run: echo "Starting HMP defconfig update for ${{ env.DEFCONFIG_NAME }} on branch ${{ env.BRANCH }}..."
+
+      - name: Checkout Repository
+        uses: actions/checkout@v5
+        with:
+          repository: ExXyrou/android_ps_kernel_xiaomi_lavender
+          ref: ${{ env.BRANCH }}
+          token: ${{ secrets.GH_PAT }}
+          path: ${{ env.KERNEL_DIR }}
+          fetch-depth: 1
+
+      - name: Edit Defconfig
+        working-directory: ${{ env.KERNEL_DIR }}
+        run: |
+          DEFCONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
+          echo "Editing $DEFCONFIG_FILE..."
+
+          enable_config()  { ./scripts/config --file "$DEFCONFIG_FILE" --enable  "$1"; }
+          disable_config() { ./scripts/config --file "$DEFCONFIG_FILE" --disable "$1"; }
+
+          # 1. FIX HMP SLEEP DEATH & IDLE STATES
+          enable_config CONFIG_CPU_IDLE_GOV_MENU
+          disable_config CONFIG_CPU_IDLE_GOV_LADDER
+          disable_config CONFIG_QCOM_FORCE_WDOG_BITE_ON_PANIC
+          disable_config CONFIG_PANIC_ON_OOPS
+
+          # 2. GAMING PERFORMANCE
+          enable_config CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE
+          disable_config CONFIG_CC_OPTIMIZE_FOR_SIZE
+
+          # 3. DISABLE OVERHEAD & DEBUGGING (BATTERY & SMOOTHNESS)
+          disable_config CONFIG_DEBUG_FS
+          disable_config CONFIG_GENERIC_TRACER
+          disable_config CONFIG_TRACING
+          disable_config CONFIG_FTRACE
+          disable_config CONFIG_DEBUG_KMEMLEAK
+          disable_config CONFIG_SCHED_DEBUG
+
+          echo "All HMP optimization configs applied to $DEFCONFIG_FILE"
+          echo "DEFCONFIG_REL_PATH=$DEFCONFIG_FILE" >> $GITHUB_ENV
+
+      - name: Commit & Push Defconfig
+        working-directory: ${{ env.KERNEL_DIR }}
+        run: |
+          git config user.name "${{ secrets.GH_USERNAME }}"
+          git config user.email "${{ secrets.GH_EMAIL }}"
+
+          if git diff --quiet "${{ env.DEFCONFIG_REL_PATH }}"; then
+            echo "No changes detected in defconfig."
+            exit 0
+          fi
+
+          git add "${{ env.DEFCONFIG_REL_PATH }}"
+          git commit -m "config: [HMP Optimize] update ${{ env.DEFCONFIG_NAME }} (${{ env.BRANCH }})"
+
+          git remote set-url origin https://x-access-token:${{ secrets.GH_PAT }}@github.com/ExXyrou/android_ps_kernel_xiaomi_lavender.git
+          git push origin HEAD:${{ env.BRANCH }} || echo "Push failed, please check permissions."
+
+  notify:
+    needs: optimize-defconfig
+    if: always()
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Send Telegram Notification
+        run: |
+          RESULT="${{ needs.optimize-defconfig.result }}"
+          ICON=$([ "$RESULT" == "success" ] && echo "✅" || echo "❌")
+          MESSAGE=$(printf '%s <b>HMP Defconfig Optimization</b>\n\n📱 <b>Target:</b> <code>%s</code>\n🌿 <b>Branch:</b> <code>%s</code>' "$ICON" "${{ env.DEFCONFIG_NAME }}" "${{ env.BRANCH }}")
+          
+          curl -s -X POST "https://api.telegram.org/bot${{ env.BOT_API }}/sendMessage" \
+            -F chat_id="${{ env.TELEGRAM_GROUP_ID }}" \
+            -F message_thread_id="345" \
+            -F parse_mode="HTML" \
+            -F text="$MESSAGE"
