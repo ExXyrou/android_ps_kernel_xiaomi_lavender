@@ -19,7 +19,7 @@ jobs:
 
     steps:
       - name: Initialize Workflow
-        run: echo "Starting HMP defconfig update for ${{ env.DEFCONFIG_NAME }} on branch ${{ env.BRANCH }}..."
+        run: echo "Starting defconfig update for ${{ env.DEFCONFIG_NAME }} on branch ${{ env.BRANCH }}..."
 
       - name: Checkout Repository
         uses: actions/checkout@v5
@@ -57,7 +57,7 @@ jobs:
           disable_config CONFIG_DEBUG_KMEMLEAK
           disable_config CONFIG_SCHED_DEBUG
 
-          echo "All HMP optimization configs applied to $DEFCONFIG_FILE"
+          echo "All optimization configs applied to $DEFCONFIG_FILE"
           echo "DEFCONFIG_REL_PATH=$DEFCONFIG_FILE" >> $GITHUB_ENV
 
       - name: Commit & Push Defconfig
