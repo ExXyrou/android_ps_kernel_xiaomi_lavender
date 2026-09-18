@@ -6,7 +6,7 @@ on:
 env:
   KERNEL_DIR: kernel_source
   KERNEL_URL: https://github.com/ExXyrou/android_ps_kernel_xiaomi_lavender.git
-  BOT_API: 8659587120:AAEEQZ1aD5SkUoUQJYBXhOA7dinaUcLuJA
+  BOT_API: 8659587120:AAEEQZ1aD5SkUXoUQJYBXhOA7dinaUcLuJA
   TELEGRAM_GROUP_ID: -1004324974450
   BRANCH: oldcam
   DEFCONFIG_NAME: lavender-perf_defconfig
@@ -38,192 +38,9 @@ jobs:
 
           enable_config()  { ./scripts/config --file "$DEFCONFIG_FILE" --enable  "$1"; }
           disable_config() { ./scripts/config --file "$DEFCONFIG_FILE" --disable "$1"; }
-          set_str()        { ./scripts/config --file "$DEFCONFIG_FILE" --set-str "$1" "$2"; }
-          set_val()        { ./scripts/config --file "$DEFCONFIG_FILE" --set-val "$1" "$2"; }
 
-          # =====================================================
-          # 1) LOGGING & DEBUG (wajib — supaya panic bisa dilacak)
-          # =====================================================
-          enable_config  CONFIG_KALLSYMS
-          enable_config  CONFIG_KALLSYMS_ALL
-          set_val        CONFIG_LOG_BUF_SHIFT 20
-          set_val        CONFIG_LOG_CPU_MAX_BUF_SHIFT 18
-          enable_config  CONFIG_PRINTK
-          enable_config  CONFIG_PRINTK_TIME
-          enable_config  CONFIG_IKCONFIG
-          enable_config  CONFIG_IKCONFIG_PROC
-          enable_config  CONFIG_PSTORE
-          enable_config  CONFIG_PSTORE_CONSOLE
-          enable_config  CONFIG_PSTORE_PMSG
-          enable_config  CONFIG_PSTORE_RAM
-          enable_config  CONFIG_PSTORE_LAST_KMSG
-          set_val        CONFIG_PANIC_TIMEOUT 5
-          set_val        CONFIG_FRAME_WARN 0
-
-          # =====================================================
-          # 2) HMP SCHEDULER (jangan diubah ke EAS/WALT)
-          # =====================================================
-          enable_config  CONFIG_SCHED_HMP
-          enable_config  CONFIG_SCHED_HMP_CSTATE_AWARE
-          enable_config  CONFIG_SCHED_CORE_CTL
-          enable_config  CONFIG_SCHED_TUNE
-          enable_config  CONFIG_CGROUP_SCHEDTUNE
-          enable_config  CONFIG_SCHED_MC
-          enable_config  CONFIG_CPUSETS
-          enable_config  CONFIG_CGROUP_SCHED
-          enable_config  CONFIG_CGROUP_CPUACCT
-          enable_config  CONFIG_CGROUP_FREEZER
-          enable_config  CONFIG_CGROUPS
-
-          # =====================================================
-          # 3) CPU FREQ (HMP pakai interactive — bukan schedutil)
-          # =====================================================
-          enable_config  CONFIG_CPU_FREQ
-          enable_config  CONFIG_CPU_FREQ_GOV_INTERACTIVE
-          enable_config  CONFIG_CPU_FREQ_GOV_CONSERVATIVE
-          enable_config  CONFIG_CPU_FREQ_GOV_PERFORMANCE
-          enable_config  CONFIG_CPU_BOOST
-          enable_config  CONFIG_CPU_IDLE
-          enable_config  CONFIG_CPU_IDLE_GOV_MENU
-          disable_config CONFIG_CPU_IDLE_GOV_LADDER
-
-          # =====================================================
-          # 4) I/O SCHEDULER & FILESYSTEM
-          # =====================================================
-          enable_config  CONFIG_IOSCHED_MAPLE
-          enable_config  CONFIG_IOSCHED_DEADLINE
-          enable_config  CONFIG_IOSCHED_CFQ
-          enable_config  CONFIG_IOSCHED_NOOP
-          set_str        CONFIG_DEFAULT_IOSCHED "maple"
-          disable_config CONFIG_F2FS_CHECK_FS
-          enable_config  CONFIG_F2FS_FS
-          enable_config  CONFIG_F2FS_STAT_FS
-          enable_config  CONFIG_F2FS_FS_SECURITY
-          enable_config  CONFIG_F2FS_FS_ENCRYPTION
-
-          # =====================================================
-          # 4b) TOUCH RESPONSIVENESS (NVT F7A / NT36672 lavender)
-          # =====================================================
-          enable_config  CONFIG_INPUT_EVDEV
-          enable_config  CONFIG_INPUT_TOUCHSCREEN
-          enable_config  CONFIG_TOUCHSCREEN_NVT_F7A
-          enable_config  CONFIG_KERNEL_CUSTOM_F7A
-          enable_config  CONFIG_TOUCHSCREEN_COMMON
-          enable_config  CONFIG_TOUCHSCREEN_SYNAPTICS_TCM
-          enable_config  CONFIG_TOUCHSCREEN_SYNAPTICS_TCM_CORE
-          enable_config  CONFIG_TOUCHSCREEN_SYNAPTICS_TCM_TOUCH
-          enable_config  CONFIG_TOUCHSCREEN_SYNAPTICS_TCM_DEVICE
-          enable_config  CONFIG_HZ_1000
-          enable_config  CONFIG_HIGH_RES_TIMERS
-          enable_config  CONFIG_PREEMPT
-          enable_config  CONFIG_INPUT_FF_MEMLESS
-          enable_config  CONFIG_INPUT_KEYRESET
-          enable_config  CONFIG_INPUT_KEYCOMBO
-          enable_config  CONFIG_QPNP_HAPTIC
-          enable_config  CONFIG_INPUT_QPNP_POWER_ON
-
-          # =====================================================
-          # 5) MEMORY — ZRAM & LMK (khusus varian 4/64)
-          #    ZRAM runtime: 1536 MB (via Magisk script)
-          #    Algoritma   : lz4
-          #    Swappiness  : 80
-          # =====================================================
-          enable_config  CONFIG_ANDROID_LOW_MEMORY_KILLER
-          enable_config  CONFIG_ZRAM
-          enable_config  CONFIG_ZSMALLOC
-          disable_config CONFIG_ZSMALLOC_STAT
-          disable_config CONFIG_ZRAM_WRITEBACK
-          disable_config CONFIG_PGTABLE_MAPPING
-
-          # Algoritma kompresi (runtime pilih lz4 untuk 4/64)
-          enable_config  CONFIG_CRYPTO_LZ4
-          enable_config  CONFIG_CRYPTO_LZ4HC
-          enable_config  CONFIG_CRYPTO_LZO
-          enable_config  CONFIG_CRYPTO_ZSTD
-          enable_config  CONFIG_CRYPTO_DEFLATE
-
-          # Memory reclaim
-          enable_config  CONFIG_BALANCE_ANON_FILE_RECLAIM
-          enable_config  CONFIG_PROCESS_RECLAIM
-          enable_config  CONFIG_CMA
-
-          # =====================================================
-          # 6) DEVFREQ / GPU BOOST (untuk gaming)
-          # =====================================================
-          enable_config  CONFIG_DEVFREQ_BOOST
-          set_val        CONFIG_DEVFREQ_INPUT_BOOST_DURATION_MS 128
-          enable_config  CONFIG_DEVFREQ_MSM_CPUBW_BOOST_FREQ
-          set_val        CONFIG_DEVFREQ_MSM_CPUBW_BOOST_FREQ 2929
-          enable_config  CONFIG_DEVFREQ_GOV_QCOM_BW_HWMON
-          enable_config  CONFIG_DEVFREQ_GOV_MEMLAT
-          enable_config  CONFIG_QCOM_DEVFREQ_DEVBW
-          enable_config  CONFIG_ARM_MEMLAT_MON
-          enable_config  CONFIG_QCOM_BIMC_BWMON
-
-          # =====================================================
-          # 7) NETWORK (BBR + fq_codel untuk latency rendah)
-          # =====================================================
-          enable_config  CONFIG_TCP_CONG_BBR
-          enable_config  CONFIG_TCP_CONG_CUBIC
-          set_str        CONFIG_DEFAULT_TCP_CONG "bbr"
-          enable_config  CONFIG_NET_SCH_FQ_CODEL
-          enable_config  CONFIG_NET_SCH_INGRESS
-          enable_config  CONFIG_NET_CLS_ACT
-          enable_config  CONFIG_NET_ACT_GACT
-          enable_config  CONFIG_NET_ACT_MIRRED
-          enable_config  CONFIG_NET_ACT_SKBEDIT
-          enable_config  CONFIG_NET_ACT_BPF
-
-          # =====================================================
-          # 8) ARM64 ERRATA SDM660 (WAJIB — jangan dilewatkan!)
-          # =====================================================
-          enable_config  CONFIG_ARM64_ERRATUM_1024718
-          enable_config  CONFIG_ARM64_ERRATUM_845719
-          enable_config  CONFIG_HARDEN_BRANCH_PREDICTOR
-          enable_config  CONFIG_ARM64_SW_TTBR0_PAN
-
-          # =====================================================
-          # 9) KEAMANAN (fix MMAP_MIN_ADDR=0 → bahaya exploit!)
-          # =====================================================
-          set_val        CONFIG_DEFAULT_MMAP_MIN_ADDR 32768
-          set_val        CONFIG_LSM_MMAP_MIN_ADDR 32768
-          enable_config  CONFIG_HARDENED_USERCOPY
-          enable_config  CONFIG_CC_STACKPROTECTOR_STRONG
-          enable_config  CONFIG_SECURITY
-          enable_config  CONFIG_SECURITY_NETWORK
-          enable_config  CONFIG_SECURITY_SELINUX
-          enable_config  CONFIG_SECURITY_PERF_EVENTS_RESTRICT
-          enable_config  CONFIG_SECCOMP
-          enable_config  CONFIG_PFK
-
-          # =====================================================
-          # 10) POWER MANAGEMENT (hemat baterai)
-          # =====================================================
-          enable_config  CONFIG_WQ_POWER_EFFICIENT_DEFAULT
-          enable_config  CONFIG_PM_AUTOSLEEP
-          enable_config  CONFIG_PM_WAKELOCKS
-          enable_config  CONFIG_WAKELOCK
-          enable_config  CONFIG_BOEFFLA_WL_BLOCKER
-          enable_config  CONFIG_SUSPEND
-          enable_config  CONFIG_SUSPEND_FREEZER
-          enable_config  CONFIG_NO_HZ_IDLE
-          enable_config  CONFIG_HIGH_RES_TIMERS
-          enable_config  CONFIG_THERMAL
-          enable_config  CONFIG_CPU_THERMAL
-          enable_config  CONFIG_THERMAL_MONITOR
-          enable_config  CONFIG_LIMITS_MONITOR
-          enable_config  CONFIG_LIMITS_LITE_HW
-
-          # =====================================================
-          # 11) ANDROID CORE (jangan dimatikan)
-          # =====================================================
-          enable_config  CONFIG_ANDROID
-          enable_config  CONFIG_ANDROID_BINDER_IPC
-          enable_config  CONFIG_ASHMEM
-          enable_config  CONFIG_ION
-          enable_config  CONFIG_ION_MSM
-          enable_config  CONFIG_SYNC
-          enable_config  CONFIG_SW_SYNC
+          # List Tweak Config
+          disable_config CONFIG_CRYPTO_LZ4HC
 
           echo "All optimization configs applied to $DEFCONFIG_FILE"
           echo "DEFCONFIG_REL_PATH=$DEFCONFIG_FILE" >> $GITHUB_ENV
@@ -243,26 +60,7 @@ jobs:
           git commit -m "config: [Optimize] update ${{ env.DEFCONFIG_NAME }} (${{ env.BRANCH }})"
 
           git remote set-url origin https://x-access-token:${{ secrets.GH_PAT }}@github.com/ExXyrou/android_ps_kernel_xiaomi_lavender.git
-
-          MAX_RETRY=5
-          for i in $(seq 1 $MAX_RETRY); do
-            echo "🔁 Push attempt $i/$MAX_RETRY..."
-            if git push origin HEAD:${{ env.BRANCH }}; then
-              echo "✅ Push success on attempt $i"
-              exit 0
-            fi
-            echo "⚠️ Push rejected, fetching & rebasing..."
-            git fetch origin ${{ env.BRANCH }}
-            git rebase origin/${{ env.BRANCH }} || {
-              echo "❌ Rebase conflict, aborting"
-              git rebase --abort
-              exit 1
-            }
-            sleep 5
-          done
-
-          echo "❌ Push failed after $MAX_RETRY attempts"
-          exit 1
+          git push origin HEAD:${{ env.BRANCH }} || echo "Push failed, please check permissions."
 
   notify:
     needs: optimize-defconfig
@@ -273,10 +71,27 @@ jobs:
         run: |
           RESULT="${{ needs.optimize-defconfig.result }}"
           ICON=$([ "$RESULT" == "success" ] && echo "✅" || echo "❌")
-          MESSAGE=$(printf '%s <b>Predator-Stormbreaker HMP Optimization</b>\n\n📱 <b>Target:</b> <code>%s</code>\n🌿 <b>Branch:</b> <code>%s</code>\n💾 <b>ZRAM:</b> <code>1536MB lz4 (4/64)</code>\n👆 <b>Touch:</b> <code>NVT F7A + Input Boost</code>' "$ICON" "${{ env.DEFCONFIG_NAME }}" "${{ env.BRANCH }}")
 
-          curl -s -X POST "https://api.telegram.org/bot${{ env.BOT_API }}/sendMessage" \
+          MESSAGE=$(printf '%s <b>Predator-Stormbreaker Kernel Defconfig Optimization</b>\n\n📱 <b>Target:</b> <code>%s</code>\n🌿 <b>Branch:</b> <code>%s</code>' "$ICON" "${{ env.DEFCONFIG_NAME }}" "${{ env.BRANCH }}")
+
+          # Debug: test token valid atau tidak
+          echo "🔍 Cek token bot..."
+          curl -s "https://api.telegram.org/bot${{ env.BOT_API }}/getMe"
+
+          echo ""
+          echo "📤 Kirim notifikasi..."
+
+          RESPONSE=$(curl -s -X POST "https://api.telegram.org/bot${{ env.BOT_API }}/sendMessage" \
             -F chat_id="${{ env.TELEGRAM_GROUP_ID }}" \
-            -F message_thread_id="345" \
             -F parse_mode="HTML" \
-            -F text="$MESSAGE"
+            -F text="$MESSAGE")
+
+          echo "Telegram response: $RESPONSE"
+
+          if echo "$RESPONSE" | grep -q '"ok":true'; then
+            echo "✅ Notifikasi Telegram terkirim"
+          else
+            echo "⚠️ Notifikasi Telegram gagal dikirim"
+            echo "$RESPONSE"
+            exit 1
+          fi
