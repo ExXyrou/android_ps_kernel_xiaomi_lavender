@@ -6,7 +6,7 @@ on:
 env:
   KERNEL_DIR: kernel_source
   KERNEL_URL: https://github.com/ExXyrou/android_ps_kernel_xiaomi_lavender.git
-  BOT_API: 8659587120:AAEEQZ1aD5SkUXoUQJYBXhOA7dinaUcLuJA
+  BOT_API: 8659587120:AAEEQZ1aD5SkUoUQJYBXhOA7dinaUcLuJA
   TELEGRAM_GROUP_ID: -1004324974450
   BRANCH: oldcam
   DEFCONFIG_NAME: lavender-perf_defconfig
@@ -71,27 +71,10 @@ jobs:
         run: |
           RESULT="${{ needs.optimize-defconfig.result }}"
           ICON=$([ "$RESULT" == "success" ] && echo "✅" || echo "❌")
-
           MESSAGE=$(printf '%s <b>Predator-Stormbreaker Kernel Defconfig Optimization</b>\n\n📱 <b>Target:</b> <code>%s</code>\n🌿 <b>Branch:</b> <code>%s</code>' "$ICON" "${{ env.DEFCONFIG_NAME }}" "${{ env.BRANCH }}")
 
-          # Debug: test token valid atau tidak
-          echo "🔍 Cek token bot..."
-          curl -s "https://api.telegram.org/bot${{ env.BOT_API }}/getMe"
-
-          echo ""
-          echo "📤 Kirim notifikasi..."
-
-          RESPONSE=$(curl -s -X POST "https://api.telegram.org/bot${{ env.BOT_API }}/sendMessage" \
+          curl -s -X POST "https://api.telegram.org/bot${{ env.BOT_API }}/sendMessage" \
             -F chat_id="${{ env.TELEGRAM_GROUP_ID }}" \
+            -F message_thread_id="345" \
             -F parse_mode="HTML" \
-            -F text="$MESSAGE")
-
-          echo "Telegram response: $RESPONSE"
-
-          if echo "$RESPONSE" | grep -q '"ok":true'; then
-            echo "✅ Notifikasi Telegram terkirim"
-          else
-            echo "⚠️ Notifikasi Telegram gagal dikirim"
-            echo "$RESPONSE"
-            exit 1
-          fi
+            -F text="$MESSAGE"
