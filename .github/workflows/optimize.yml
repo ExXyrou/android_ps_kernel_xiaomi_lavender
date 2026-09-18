@@ -45,39 +45,26 @@ jobs:
           set_val()        { ./scripts/config --file "$DEFCONFIG_FILE" --set-val "$1" "$2"; }
 
           # ==========================================
-          # 0. LOCALVERSION TWEAK
+          # 0. LOCALVERSION & HOSTNAME TWEAK
           # ==========================================
           disable_config CONFIG_LOCALVERSION_AUTO
 
           # ==========================================
-          # 1. OPTIMALISASI CPU & GOVERNOR (HMP Base)
-          # ==========================================
-          enable_config CONFIG_CPU_FREQ_GOV_SCHEDUTIL
-          enable_config CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL
-          enable_config CONFIG_CPU_FREQ_GOV_PERFORMANCE
-          
-          # Mematikan governor bawaan HMP dan governor lainnya
-          disable_config CONFIG_CPU_FREQ_GOV_INTERACTIVE
-          disable_config CONFIG_CPU_FREQ_GOV_POWERSAVE
-          disable_config CONFIG_CPU_FREQ_GOV_USERSPACE
-          disable_config CONFIG_CPU_FREQ_GOV_ONDEMAND
-          disable_config CONFIG_CPU_FREQ_GOV_CONSERVATIVE
-          
-          # ==========================================
           # 2. OPTIMALISASI TOUCH & RESPONSIVITAS UI
           # ==========================================
+          # Defconfig kamu pakai HZ_100 -> matikan dulu, baru set HZ_1000
           disable_config CONFIG_HZ_100
           disable_config CONFIG_HZ_300
-          enable_config CONFIG_HZ_1000
-          set_val CONFIG_HZ 1000
-          
+          enable_config  CONFIG_HZ_1000
+          set_val        CONFIG_HZ 1000
+
           # ==========================================
           # 3. OPTIMALISASI JARINGAN (BBR + FQ)
           # ==========================================
           enable_config CONFIG_TCP_CONG_BBR
           enable_config CONFIG_NET_SCH_FQ
-          set_str CONFIG_DEFAULT_TCP_CONG "bbr"
-          
+          set_str       CONFIG_DEFAULT_TCP_CONG "bbr"
+
           # ==========================================
           # 4. OPTIMALISASI MULTITASKING & ZRAM
           # ==========================================
@@ -85,7 +72,7 @@ jobs:
           enable_config CONFIG_ZSMALLOC
           enable_config CONFIG_CRYPTO_LZ4
           enable_config CONFIG_ZRAM_LZ4_COMPRESS
-          
+
           # ==========================================
           # 5. KESTABILAN HARIAN & MINIM BUG
           # ==========================================
@@ -95,13 +82,13 @@ jobs:
           disable_config CONFIG_SLUB_DEBUG
           disable_config CONFIG_DEBUG_SPINLOCK
           disable_config CONFIG_DEBUG_MUTEXES
-          
+
           enable_config CONFIG_PRINTK
           enable_config CONFIG_BUG
           enable_config CONFIG_KALLSYMS
           enable_config CONFIG_KALLSYMS_ALL
           enable_config CONFIG_PANIC_ON_OOPS
-          set_val CONFIG_PANIC_TIMEOUT 5
+          set_val       CONFIG_PANIC_TIMEOUT 5
 
           echo "All optimization configs applied to $DEFCONFIG_FILE"
           echo "DEFCONFIG_REL_PATH=$DEFCONFIG_FILE" >> $GITHUB_ENV
@@ -163,7 +150,7 @@ jobs:
             ICON="❓"
           fi
 
-          MESSAGE=$(printf '%s <b>San Kernel Defconfig Optimization</b>\n\n📱 <b>Device:</b> <code>lavender</code>\n🌿 <b>Target:</b> <code>HMP 4.4 (oldcam)</code>\n⚙️ <b>Status:</b> <code>%s</code>\n🔧 <b>Tweaks:</b> <code>HZ=1000, Schedutil/Perf, No Auto Localversion</code>' "$ICON" "$RESULT")
+          MESSAGE=$(printf '%s <b>San Kernel Defconfig Optimization</b>\n\n📱 <b>Device:</b> <code>lavender</code>\n🌿 <b>Target:</b> <code>HMP 4.4 (oldcam)</code>\n⚙️ <b>Status:</b> <code>%s</code>\n🔧 <b>Tweaks:</b> <code>HZ=1000, TCP BBR, ZRAM LZ4</code>' "$ICON" "$RESULT")
 
           curl -s -X POST "https://api.telegram.org/bot${{ env.BOT_API }}/sendMessage" \
             -F chat_id="${{ env.TELEGRAM_GROUP_ID }}" \
