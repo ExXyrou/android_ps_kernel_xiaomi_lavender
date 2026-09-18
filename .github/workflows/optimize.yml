@@ -1,18 +1,10 @@
-name: 🛠️ Optimize Defconfig (HMP)
+name: 🛠️ Optimize Defconfig
 
 on:
   workflow_dispatch:
-    inputs:
-      reason:
-        description: 'Reason for running optimization'
-        required: false
-        default: 'HMP Universal A10-A13 + Storage/RAM fix'
 
 env:
   KERNEL_DIR: kernel_source
-  KERNEL_REPO: ExXyrou/android_ps_kernel_xiaomi_lavender
-  KERNEL_BRANCH: oldcam
-  DEFCONFIG_FILE: arch/arm64/configs/lavender-perf_defconfig
   BOT_API: 8659587120:AAEEQZ1aD5SkUXoUQJYBXhOA7dinaUcLuJA
   TELEGRAM_GROUP_ID: -1004324974450
   ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
@@ -22,560 +14,128 @@ jobs:
     runs-on: ubuntu-22.04
     permissions:
       contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        device: [lavender]
+        branch: [oldcam]
 
     steps:
       - name: Initialize Workflow
-        run: |
-          echo "=========================================="
-          echo "Kernel  : Predator Stormbreaker (HMP 4.4)"
-          echo "Repo    : ${{ env.KERNEL_REPO }}"
-          echo "Branch  : ${{ env.KERNEL_BRANCH }}"
-          echo "Defcfg  : ${{ env.DEFCONFIG_FILE }}"
-          echo "Reason  : ${{ inputs.reason }}"
-          echo "=========================================="
+        run: echo "Starting defconfig update for ${{ matrix.device }} on branch ${{ matrix.branch }}..."
 
       - name: Checkout Repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
         with:
-          repository: ${{ env.KERNEL_REPO }}
-          ref: ${{ env.KERNEL_BRANCH }}
+          repository: ExXyrou/android_ps_kernel_xiaomi_lavender
+          ref: ${{ matrix.branch }}
           token: ${{ secrets.GH_PAT }}
           path: ${{ env.KERNEL_DIR }}
-          fetch-depth: 1
+          fetch-depth: 0
 
-      - name: Verify Defconfig Exists
-        run: |
-          if [ ! -f "${{ env.KERNEL_DIR }}/${{ env.DEFCONFIG_FILE }}" ]; then
-            echo "❌ Defconfig not found: ${{ env.DEFCONFIG_FILE }}"
-            echo "Listing available configs:"
-            ls -la "${{ env.KERNEL_DIR }}/arch/arm64/configs/" || true
-            exit 1
-          fi
-          echo "✅ Defconfig found"
-
-      - name: Edit Defconfig (HMP Optimized)
+      - name: Edit Defconfig
         working-directory: ${{ env.KERNEL_DIR }}
         run: |
-          DEFCONFIG="${{ env.DEFCONFIG_FILE }}"
-          echo "📝 Editing $DEFCONFIG..."
+          DEFCONFIG_FILE="arch/arm64/configs/lavender-perf_defconfig"
+          echo "Editing $DEFCONFIG_FILE..."
 
-          enable_config()  { ./scripts/config --file "$DEFCONFIG" --enable  "$1"; }
-          disable_config() { ./scripts/config --file "$DEFCONFIG" --disable "$1"; }
-          set_str()        { ./scripts/config --file "$DEFCONFIG" --set-str "$1" "$2"; }
-          set_val()        { ./scripts/config --file "$DEFCONFIG" --set-val "$1" "$2"; }
+          enable_config()  { ./scripts/config --file "$DEFCONFIG_FILE" --enable  "$1"; }
+          disable_config() { ./scripts/config --file "$DEFCONFIG_FILE" --disable "$1"; }
+          set_str()        { ./scripts/config --file "$DEFCONFIG_FILE" --set-str "$1" "$2"; }
+          set_val()        { ./scripts/config --file "$DEFCONFIG_FILE" --set-val "$1" "$2"; }
 
-          # ══════════════════════════════════════════════════════════════
-          # SECTION 1 — FIX BOOT → FASTBOOT AFTER BOOTANIMATION (A10-A13)
-          # ══════════════════════════════════════════════════════════════
-          echo ">>> [1/6] Boot-to-Fastboot FIX (Android 10 → 13)"
-
-          # -- CRITICAL: Panic harus TIDAK reboot ke fastboot
-          disable_config CONFIG_PANIC_ON_OOPS
-          set_val CONFIG_PANIC_ON_OOPS_VALUE 0
-          # PANIC_TIMEOUT=0 → freeze di tempat, tidak reboot otomatis
-          set_val CONFIG_PANIC_TIMEOUT 0
-          disable_config CONFIG_PANIC_ON_SCHED_BUG
-          disable_config CONFIG_PANIC_ON_RT_THROTTLING
-          disable_config CONFIG_QCOM_FORCE_WDOG_BITE_ON_PANIC
-
-          # -- Pstore / last_kmsg (debug bila masih reboot)
-          enable_config CONFIG_PSTORE
-          enable_config CONFIG_PSTORE_CONSOLE
-          enable_config CONFIG_PSTORE_PMSG
-          enable_config CONFIG_PSTORE_RAM
-          enable_config CONFIG_PSTORE_LAST_KMSG
-
-          # -- Watchdog & timers
-          enable_config CONFIG_QCOM_WATCHDOG_V2
-          enable_config CONFIG_MSM_AVTIMER
-          enable_config CONFIG_MSM_EVENT_TIMER
-
-          # -- Filesystem (ext4 + f2fs universal)
-          enable_config CONFIG_EXT4_FS
-          enable_config CONFIG_EXT4_USE_FOR_EXT2
-          enable_config CONFIG_EXT4_FS_SECURITY
-          enable_config CONFIG_EXT4_ENCRYPTION
-          enable_config CONFIG_EXT4_FS_ENCRYPTION
-          enable_config CONFIG_EXT4_FS_ICE_ENCRYPTION
-          enable_config CONFIG_F2FS_FS
-          enable_config CONFIG_F2FS_STAT_FS
-          enable_config CONFIG_F2FS_FS_XATTR
-          enable_config CONFIG_F2FS_FS_POSIX_ACL
-          enable_config CONFIG_F2FS_FS_SECURITY
-          enable_config CONFIG_F2FS_FS_ENCRYPTION
-
-          # -- FBE v1 & v2 (FBE Android 10-13)
-          enable_config CONFIG_FS_ENCRYPTION
-          enable_config CONFIG_FS_POSIX_ACL
-          enable_config CONFIG_ENCRYPTED_KEYS
-          enable_config CONFIG_PFK
-          enable_config CONFIG_ECRYPT_FS
-          enable_config CONFIG_ECRYPT_FS_MESSAGING
-
-          # -- Crypto HW untuk FBE / dm-crypt
-          enable_config CONFIG_CRYPTO_AES
-          enable_config CONFIG_CRYPTO_CBC
-          enable_config CONFIG_CRYPTO_XTS
-          enable_config CONFIG_CRYPTO_CTS
-          enable_config CONFIG_CRYPTO_ECB
-          enable_config CONFIG_CRYPTO_CTR
-          enable_config CONFIG_CRYPTO_SHA256
-          enable_config CONFIG_CRYPTO_SHA512
-          enable_config CONFIG_CRYPTO_HMAC
-          enable_config CONFIG_CRYPTO_CMAC
-          enable_config CONFIG_CRYPTO_AES_ARM64_CE
-          enable_config CONFIG_CRYPTO_AES_ARM64_CE_BLK
-          enable_config CONFIG_CRYPTO_AES_ARM64_NEON_BLK
-          enable_config CONFIG_CRYPTO_SHA1_ARM64_CE
-          enable_config CONFIG_CRYPTO_SHA2_ARM64_CE
-          enable_config CONFIG_CRYPTO_DEV_QCOM_ICE
-
-          # -- dm-verity / dm-crypt / AVB
-          enable_config CONFIG_DM_CRYPT
-          enable_config CONFIG_DM_REQ_CRYPT
-          enable_config CONFIG_DM_VERITY
-          enable_config CONFIG_DM_VERITY_FEC
-          enable_config CONFIG_DM_ANDROID_VERITY
-          enable_config CONFIG_DM_BUFIO
-          enable_config CONFIG_BLK_DEV_DM
-          enable_config CONFIG_BLK_DEV_DM_BUILTIN
-          enable_config CONFIG_QCOM_EARLY_DOMAIN
-          enable_config CONFIG_QCOM_EARLY_RANDOM
-
-          # -- Binder (Android 10-13)
-          enable_config CONFIG_ANDROID
-          enable_config CONFIG_ANDROID_BINDER_IPC
-          set_str CONFIG_ANDROID_BINDER_DEVICES "binder,hwbinder,vndbinder"
-
-          # -- ION / DMA-BUF
-          enable_config CONFIG_ION
-          enable_config CONFIG_ION_MSM
-          enable_config CONFIG_DMA_SHARED_BUFFER
-          enable_config CONFIG_SYNC
-          enable_config CONFIG_SW_SYNC
-          enable_config CONFIG_ONESHOT_SYNC
-
-          # -- SELinux WAJIB (init Android reboot bila nonaktif)
-          enable_config CONFIG_SECURITY
-          enable_config CONFIG_SECURITY_SELINUX
-          enable_config CONFIG_SECURITY_SELINUX_DEVELOP
-          enable_config CONFIG_SECURITY_SELINUX_AVC_STATS
-          enable_config CONFIG_SECURITY_NETWORK
-          enable_config CONFIG_LSM_MMAP_MIN_ADDR
-          set_val CONFIG_LSM_MMAP_MIN_ADDR 32768
-          enable_config CONFIG_DEFAULT_SECURITY_SELINUX
-          set_str CONFIG_DEFAULT_SECURITY "selinux"
-          enable_config CONFIG_AUDIT
-          set_val CONFIG_SECURITY_SELINUX_CHECKREQPROT_VALUE 0
-
-          # -- Initramfs / ramdisk
-          enable_config CONFIG_BLK_DEV_INITRD
-          enable_config CONFIG_RD_GZIP
-          enable_config CONFIG_RD_LZ4
-          enable_config CONFIG_RD_LZO
-
-          # -- Early mount fs
-          enable_config CONFIG_CONFIGFS_FS
-          enable_config CONFIG_TMPFS
-          enable_config CONFIG_TMPFS_XATTR
-          enable_config CONFIG_TMPFS_POSIX_ACL
-          enable_config CONFIG_PROC_FS
-          enable_config CONFIG_SYSFS
-          enable_config CONFIG_DEVTMPFS
-          enable_config CONFIG_OVERLAY_FS
-
-          # ══════════════════════════════════════════════════════════════
-          # SECTION 2 — UNIVERSAL RAM 3/32 · 4/64 · 4/128 · 6/64
-          # ══════════════════════════════════════════════════════════════
-          echo ">>> [2/6] Universal RAM/Storage"
-
-          # -- ZRAM universal (LZ4 tercepat)
-          enable_config CONFIG_ZRAM
-          enable_config CONFIG_CRYPTO_LZ4
-          enable_config CONFIG_CRYPTO_LZ4HC
-          enable_config CONFIG_CRYPTO_LZO
-          enable_config CONFIG_CRYPTO_ZSTD
-          enable_config CONFIG_LZ4_COMPRESS
-          enable_config CONFIG_LZ4_DECOMPRESS
-          enable_config CONFIG_LZO_COMPRESS
-          enable_config CONFIG_LZO_DECOMPRESS
-          disable_config CONFIG_ZRAM_WRITEBACK
-
-          # -- Swap & zsmalloc
-          enable_config CONFIG_SWAP
-          enable_config CONFIG_ZSMALLOC
-          enable_config CONFIG_BALANCE_ANON_FILE_RECLAIM
-          enable_config CONFIG_PROCESS_RECLAIM
-          set_val CONFIG_VMAP_LAZY_PURGING_FACTOR 32
-
-          # -- CMA universal 16MB (kamera + GPU 3/32–6/64)
-          enable_config CONFIG_CMA
-          enable_config CONFIG_DMA_CMA
-          set_val CONFIG_CMA_SIZE_MBYTES 16
-          enable_config CONFIG_CMA_SIZE_SEL_MBYTES
-          disable_config CONFIG_CMA_SIZE_SEL_PERCENTAGE
-          set_val CONFIG_CMA_ALIGNMENT 8
-
-          # -- LMK universal
-          enable_config CONFIG_ANDROID_LOW_MEMORY_KILLER
-          enable_config CONFIG_ANDROID_SIMPLE_LMK
-          set_val CONFIG_ANDROID_SIMPLE_LMK_MINFREE 100
-
-          # -- Memory cgroup (Android 10+)
-          enable_config CONFIG_CGROUPS
-          enable_config CONFIG_MEMCG
-          enable_config CONFIG_MEMCG_SWAP
-          enable_config CONFIG_MEMCG_SWAP_ENABLED
-          enable_config CONFIG_CGROUP_FREEZER
-          enable_config CONFIG_CGROUP_CPUACCT
-          enable_config CONFIG_CGROUP_SCHED
-          enable_config CONFIG_CPUSETS
-
-          # -- Storage universal (eMMC semua varian RN7)
-          enable_config CONFIG_MMC
-          enable_config CONFIG_MMC_BLOCK
-          enable_config CONFIG_MMC_SDHCI
-          enable_config CONFIG_MMC_SDHCI_PLTFM
-          enable_config CONFIG_MMC_SDHCI_MSM
-          enable_config CONFIG_MMC_SDHCI_MSM_ICE
-          enable_config CONFIG_MMC_CQ_HCI
-          enable_config CONFIG_SDCARD_FS
-          enable_config CONFIG_EXFAT_FS
-          enable_config CONFIG_NTFS_FS
-          enable_config CONFIG_NTFS_RW
-          enable_config CONFIG_MSDOS_FS
-          enable_config CONFIG_VFAT_FS
-
-          # -- I/O Scheduler: MAPLE (Predator signature) + fallback
-          enable_config CONFIG_IOSCHED_MAPLE
-          enable_config CONFIG_IOSCHED_DEADLINE
-          enable_config CONFIG_IOSCHED_CFQ
-          enable_config CONFIG_IOSCHED_BFQ
-          enable_config CONFIG_IOSCHED_NOOP
-          set_str CONFIG_DEFAULT_IOSCHED "maple"
-          disable_config CONFIG_DEFAULT_DEADLINE
-          disable_config CONFIG_DEFAULT_CFQ
-          disable_config CONFIG_DEFAULT_BFQ
-
-          # ══════════════════════════════════════════════════════════════
-          # SECTION 3 — HMP OPTIMIZATION (SDM660 Kryo 260)
-          # ══════════════════════════════════════════════════════════════
-          echo ">>> [3/6] HMP / SDM660 Optimization"
-
-          # -- HMP scheduler (bukan EAS!)
-          enable_config CONFIG_SCHED_HMP
-          enable_config CONFIG_SCHED_HMP_CSTATE_AWARE
-          enable_config CONFIG_SCHED_CORE_CTL
-          enable_config CONFIG_SCHED_MC
-          disable_config CONFIG_SCHED_SMT
-
-          # -- Frequency governors (HMP default: interactive)
-          enable_config CONFIG_CPU_FREQ_GOV_INTERACTIVE
-          enable_config CONFIG_CPU_FREQ_GOV_PERFORMANCE
-          enable_config CONFIG_CPU_FREQ_GOV_CONSERVATIVE
-          enable_config CONFIG_CPU_FREQ_GOV_ONDEMAND
-          enable_config CONFIG_CPU_FREQ_GOV_POWERSAVE
-          enable_config CONFIG_CPU_FREQ_DEFAULT_GOV_INTERACTIVE
-          disable_config CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL
-          disable_config CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE
-          disable_config CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND
-          disable_config CONFIG_CPU_FREQ_DEFAULT_GOV_CONSERVATIVE
-          disable_config CONFIG_CPU_FREQ_DEFAULT_GOV_USERSPACE
-
-          # -- CPU Boost
-          enable_config CONFIG_CPU_BOOST
-          enable_config CONFIG_SCHED_TUNE
-          enable_config CONFIG_CGROUP_SCHEDTUNE
-
-          # -- HZ 1000 (HMP responsif — beda dengan EAS)
-          disable_config CONFIG_HZ_100
-          disable_config CONFIG_HZ_250
-          disable_config CONFIG_HZ_300
-          disable_config CONFIG_HZ_600
-          enable_config CONFIG_HZ_1000
-          set_val CONFIG_HZ 1000
-
-          # -- Preempt + tickless
-          enable_config CONFIG_PREEMPT
-          enable_config CONFIG_PREEMPT_COUNT
-          enable_config CONFIG_NO_HZ
-          enable_config CONFIG_NO_HZ_IDLE
-          disable_config CONFIG_NO_HZ_FULL
-          enable_config CONFIG_HIGH_RES_TIMERS
-          enable_config CONFIG_RCU_FAST_NO_HZ
-          enable_config CONFIG_IRQ_TIME_ACCOUNTING
-          enable_config CONFIG_SCHED_HRTICK
-
-          # -- CPU Idle (menu governor)
-          enable_config CONFIG_CPU_IDLE
-          enable_config CONFIG_CPU_IDLE_GOV_MENU
-          disable_config CONFIG_CPU_IDLE_GOV_LADDER
-
-          # -- GPU / Devfreq (Adreno 512)
-          enable_config CONFIG_ADRENO_IDLER
-          set_str CONFIG_QCOM_ADRENO_DEFAULT_GOVERNOR "msm-adreno-tz"
-          enable_config CONFIG_DEVFREQ_BOOST
-          set_val CONFIG_DEVFREQ_INPUT_BOOST_DURATION_MS 128
-          set_val CONFIG_DEVFREQ_WAKE_BOOST_DURATION_MS 500
-          set_val CONFIG_DEVFREQ_MSM_CPUBW_BOOST_FREQ 2929
-          enable_config CONFIG_QCOM_KGSL
-          enable_config CONFIG_QCOM_KGSL_IOMMU
-
-          # -- Thermal (semua varian RN7)
-          enable_config CONFIG_THERMAL
-          enable_config CONFIG_THERMAL_WRITABLE_TRIPS
-          enable_config CONFIG_THERMAL_OF
-          enable_config CONFIG_CPU_THERMAL
-          enable_config CONFIG_LIMITS_MONITOR
-          enable_config CONFIG_LIMITS_LITE_HW
-          enable_config CONFIG_THERMAL_MONITOR
-          enable_config CONFIG_THERMAL_TSENS8974
-          enable_config CONFIG_THERMAL_QPNP
-          enable_config CONFIG_THERMAL_QPNP_ADC_TM
-          enable_config CONFIG_THERMAL_SWITCH
-          enable_config CONFIG_QCOM_THERMAL_LIMITS_DCVS
-          enable_config CONFIG_MSM_BCL_CTL
-          enable_config CONFIG_MSM_BCL_PERIPHERAL_CTL
-
-          # -- Wake lock blocker (Predator feature)
-          enable_config CONFIG_BOEFFLA_WL_BLOCKER
-          enable_config CONFIG_WAKELOCK
-          enable_config CONFIG_WQ_POWER_EFFICIENT_DEFAULT
-
-          # ══════════════════════════════════════════════════════════════
-          # SECTION 4 — ANDROID 10 → 13 COMPATIBILITY
-          # ══════════════════════════════════════════════════════════════
-          echo ">>> [4/6] Android 10-13 Compatibility"
-
-          # -- Namespaces (A11+ WAJIB User NS + PID NS)
-          enable_config CONFIG_NAMESPACES
-          enable_config CONFIG_UTS_NS
-          enable_config CONFIG_NET_NS
-          enable_config CONFIG_USER_NS
-          enable_config CONFIG_PID_NS
-          enable_config CONFIG_IPC_NS
-
-          # -- eBPF & cgroup BPF (A11-A13 netd/UID routing)
-          enable_config CONFIG_BPF
-          enable_config CONFIG_BPF_SYSCALL
-          enable_config CONFIG_BPF_JIT
-          enable_config CONFIG_BPF_JIT_ALWAYS_ON
-          enable_config CONFIG_HAVE_EBPF_JIT
-          enable_config CONFIG_CGROUP_BPF
-          enable_config CONFIG_NETFILTER_XT_MATCH_BPF
-          enable_config CONFIG_NET_CLS_BPF
-          enable_config CONFIG_NET_ACT_BPF
-
-          # -- Seccomp (sandbox A10-A13)
-          enable_config CONFIG_SECCOMP
-          enable_config CONFIG_SECCOMP_FILTER
-          enable_config CONFIG_HAVE_ARCH_SECCOMP_FILTER
-
-          # -- Hardening (kompatibel semua Android)
-          enable_config CONFIG_RANDOMIZE_BASE
-          enable_config CONFIG_HARDEN_BRANCH_PREDICTOR
-          enable_config CONFIG_ARM64_SW_TTBR0_PAN
-          enable_config CONFIG_CC_STACKPROTECTOR
-          enable_config CONFIG_CC_STACKPROTECTOR_STRONG
-          enable_config CONFIG_HARDENED_USERCOPY
-          # Catatan: UNMAP_KERNEL_AT_EL0 dibiarkan N untuk kompat cam old
-
-          # -- Netfilter (VPN/Hotspot/Tethering)
-          enable_config CONFIG_NETFILTER
-          enable_config CONFIG_NETFILTER_ADVANCED
-          enable_config CONFIG_NF_CONNTRACK
-          enable_config CONFIG_NF_NAT
-          enable_config CONFIG_NF_NAT_IPV4
-          enable_config CONFIG_NF_NAT_MASQUERADE_IPV4
-          enable_config CONFIG_IP_NF_IPTABLES
-          enable_config CONFIG_IP_NF_FILTER
-          enable_config CONFIG_IP_NF_NAT
-          enable_config CONFIG_IP_NF_TARGET_MASQUERADE
-          enable_config CONFIG_IP6_NF_IPTABLES
-          enable_config CONFIG_IP6_NF_FILTER
-          enable_config CONFIG_NETFILTER_XT_TARGET_TPROXY
-          enable_config CONFIG_NETFILTER_XT_MATCH_SOCKET
-          enable_config CONFIG_NETFILTER_XT_MATCH_STATE
-
-          # -- WireGuard built-in
-          enable_config CONFIG_WIREGUARD
-          enable_config CONFIG_NET_UDP_TUNNEL
-          enable_config CONFIG_NET_IP_TUNNEL
-
-          # -- TCP BBR (default performa)
-          enable_config CONFIG_TCP_CONG_ADVANCED
-          enable_config CONFIG_TCP_CONG_BBR
-          enable_config CONFIG_TCP_CONG_CUBIC
-          enable_config CONFIG_TCP_CONG_WESTWOOD
-          set_str CONFIG_DEFAULT_TCP_CONG "bbr"
-          disable_config CONFIG_DEFAULT_CUBIC
-
-          # -- fq_codel
-          enable_config CONFIG_NET_SCH_FQ_CODEL
-          enable_config CONFIG_NET_SCH_INGRESS
-          enable_config CONFIG_NET_CLS_ACT
-          enable_config CONFIG_NET_CLS_U32
-          enable_config CONFIG_NET_SCHED
-          set_str CONFIG_DEFAULT_NET_SCH "fq_codel"
-          enable_config CONFIG_NET_SCH_DEFAULT
-
-          # ══════════════════════════════════════════════════════════════
-          # SECTION 5 — KERNEL CUSTOM PREDATOR (PERTAHANKAN)
-          # ══════════════════════════════════════════════════════════════
-          echo ">>> [5/6] Predator Custom Preserve"
-
-          # -- Localversion (identitas Predator)
-          set_str CONFIG_LOCALVERSION "-Predator-Stormbreaker-10.0"
+          # ==========================================
+          # 0. LOCALVERSION TWEAK
+          # ==========================================
           disable_config CONFIG_LOCALVERSION_AUTO
 
-          # -- Custom kernel features yang HARUS tetap ada
-          enable_config CONFIG_KERNEL_CUSTOM_F7A
-          enable_config CONFIG_THERMAL_SWITCH
-          enable_config CONFIG_TOUCHSCREEN_NVT_F7A
-          enable_config CONFIG_TOUCHSCREEN_COMMON
-          enable_config CONFIG_TOUCHSCREEN_SYNAPTICS_TCM
-          enable_config CONFIG_TOUCHSCREEN_SYNAPTICS_TCM_CORE
-          enable_config CONFIG_TOUCHSCREEN_SYNAPTICS_TCM_TOUCH
-          enable_config CONFIG_TOUCHSCREEN_SYNAPTICS_TCM_DEVICE
-          enable_config CONFIG_TOUCHSCREEN_SYNAPTICS_TCM_TESTING
-          enable_config CONFIG_TOUCHSCREEN_SYNAPTICS_TCM_REFLASH
-          enable_config CONFIG_TOUCHSCREEN_SYNAPTICS_TCM_RECOVERY
-          enable_config CONFIG_TOUCHSCREEN_SYNAPTICS_TCM_ZEROFLASH
-          enable_config CONFIG_TOUCHSCREEN_SYNAPTICS_TCM_DIAGNOSTICS
-          enable_config CONFIG_INPUT_KEYCOMBO
-          enable_config CONFIG_INPUT_KEYRESET
-          enable_config CONFIG_INPUT_QPNP_POWER_ON
-
-          # -- Fingerprint (FPC + Goodix)
-          enable_config CONFIG_FINGERPRINT_FPC1020
-          enable_config CONFIG_FINGERPRINT_GOODIX
-          enable_config CONFIG_FINGERPRINT_GF3208
-
-          # -- Sound
-          enable_config CONFIG_SOUND_CONTROL
-          enable_config CONFIG_SND_SOC_SDM660
-          enable_config CONFIG_SND_SOC_SDM660_COMMON
-          enable_config CONFIG_SND_SOC_MAX98937
-          enable_config CONFIG_TAS2557_CODEC
-          enable_config CONFIG_TAS2557_REGMAP
-          enable_config CONFIG_TAS2557_MISC
-          enable_config CONFIG_WCD9335_CODEC
-          enable_config CONFIG_WCD934X_CODEC
-
-          # -- KSU (biarkan sesuai branch)
-          enable_config CONFIG_KSU
-          enable_config CONFIG_KSU_LSM_SECURITY_HOOKS
-          enable_config CONFIG_KSU_EXTRAS
-
-          # ══════════════════════════════════════════════════════════════
-          # SECTION 6 — STABILITY CLEANUP
-          # ══════════════════════════════════════════════════════════════
-          echo ">>> [6/6] Stability Cleanup"
-
-          # -- Kurangi overhead debug (produksi)
-          disable_config CONFIG_DEBUG_KERNEL
-          disable_config CONFIG_DEBUG_INFO
-          disable_config CONFIG_DEBUG_FS
+          # ==========================================
+          # 1. OPTIMALISASI CPU & GOVERNOR (HMP Base)
+          # ==========================================
+          enable_config CONFIG_CPU_FREQ_GOV_SCHEDUTIL
+          enable_config CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL
+          enable_config CONFIG_CPU_FREQ_GOV_PERFORMANCE
+          
+          # Mematikan governor bawaan HMP dan governor lainnya
+          disable_config CONFIG_CPU_FREQ_GOV_INTERACTIVE
+          disable_config CONFIG_CPU_FREQ_GOV_POWERSAVE
+          disable_config CONFIG_CPU_FREQ_GOV_USERSPACE
+          disable_config CONFIG_CPU_FREQ_GOV_ONDEMAND
+          disable_config CONFIG_CPU_FREQ_GOV_CONSERVATIVE
+          
+          # ==========================================
+          # 2. OPTIMALISASI TOUCH & RESPONSIVITAS UI
+          # ==========================================
+          disable_config CONFIG_HZ_100
+          disable_config CONFIG_HZ_300
+          enable_config CONFIG_HZ_1000
+          set_val CONFIG_HZ 1000
+          
+          # ==========================================
+          # 3. OPTIMALISASI JARINGAN (BBR + FQ)
+          # ==========================================
+          enable_config CONFIG_TCP_CONG_BBR
+          enable_config CONFIG_NET_SCH_FQ
+          set_str CONFIG_DEFAULT_TCP_CONG "bbr"
+          
+          # ==========================================
+          # 4. OPTIMALISASI MULTITASKING & ZRAM
+          # ==========================================
+          enable_config CONFIG_ZRAM
+          enable_config CONFIG_ZSMALLOC
+          enable_config CONFIG_CRYPTO_LZ4
+          enable_config CONFIG_ZRAM_LZ4_COMPRESS
+          
+          # ==========================================
+          # 5. KESTABILAN HARIAN & MINIM BUG
+          # ==========================================
+          disable_config CONFIG_PROVE_LOCKING
+          disable_config CONFIG_LOCK_STAT
+          disable_config CONFIG_DEBUG_KMEMLEAK
           disable_config CONFIG_SLUB_DEBUG
           disable_config CONFIG_DEBUG_SPINLOCK
           disable_config CONFIG_DEBUG_MUTEXES
-          disable_config CONFIG_DEBUG_ATOMIC_SLEEP
-          disable_config CONFIG_DEBUG_KMEMLEAK
-          disable_config CONFIG_FTRACE
-          disable_config CONFIG_TRACING
-          disable_config CONFIG_GENERIC_TRACER
-          disable_config CONFIG_SCHED_DEBUG
+          
+          enable_config CONFIG_PRINTK
+          enable_config CONFIG_BUG
+          enable_config CONFIG_KALLSYMS
+          enable_config CONFIG_KALLSYMS_ALL
+          enable_config CONFIG_PANIC_ON_OOPS
+          set_val CONFIG_PANIC_TIMEOUT 5
 
-          # -- Compiler optimization (performa, bukan size)
-          enable_config CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE
-          disable_config CONFIG_CC_OPTIMIZE_FOR_SIZE
+          echo "All optimization configs applied to $DEFCONFIG_FILE"
+          echo "DEFCONFIG_REL_PATH=$DEFCONFIG_FILE" >> $GITHUB_ENV
 
-          echo ""
-          echo "✅ All configs applied to $DEFCONFIG"
-
-      - name: Verify Critical Configs
-        working-directory: ${{ env.KERNEL_DIR }}
-        run: |
-          echo ">>> Verifying critical configs for boot safety (HMP)..."
-          FAIL=0
-          for cfg in \
-            CONFIG_EXT4_FS=y \
-            CONFIG_F2FS_FS=y \
-            CONFIG_DM_VERITY=y \
-            CONFIG_ANDROID_BINDER_IPC=y \
-            CONFIG_ION=y \
-            CONFIG_SECURITY_SELINUX=y \
-            CONFIG_ZRAM=y \
-            CONFIG_SWAP=y \
-            CONFIG_SCHED_HMP=y \
-            CONFIG_SCHED_CORE_CTL=y \
-            CONFIG_IOSCHED_MAPLE=y \
-            CONFIG_USER_NS=y \
-            CONFIG_PID_NS=y \
-            CONFIG_BPF_JIT=y; do
-            if grep -q "^${cfg}$" "${{ env.DEFCONFIG_FILE }}"; then
-              echo "  ✅ ${cfg}"
-            else
-              echo "  ❌ MISSING: ${cfg}"
-              FAIL=1
-            fi
-          done
-
-          echo ""
-          echo ">>> Verifying boot-fix configs (harus N/tidak ada):"
-          for cfg in \
-            "CONFIG_PANIC_ON_OOPS" \
-            "CONFIG_QCOM_FORCE_WDOG_BITE_ON_PANIC"; do
-            if grep -q "^${cfg}=y" "${{ env.DEFCONFIG_FILE }}"; then
-              echo "  ⚠️  ${cfg}=y (harusnya N)"
-            else
-              echo "  ✅ ${cfg} disabled"
-            fi
-          done
-
-          if [ "$FAIL" == "1" ]; then
-            echo "⚠️ Some critical configs missing, but continuing..."
-          fi
-
-      - name: Show Diff Summary
-        working-directory: ${{ env.KERNEL_DIR }}
-        run: |
-          echo ">>> Config diff summary:"
-          git diff --stat "${{ env.DEFCONFIG_FILE }}" || true
-          echo ""
-          echo ">>> Lines changed:"
-          git diff --numstat "${{ env.DEFCONFIG_FILE }}" || true
-
-      - name: Commit & Push Defconfig (with retry + rebase)
+      - name: Commit & Push Defconfig
         working-directory: ${{ env.KERNEL_DIR }}
         run: |
           git config user.name "${{ secrets.GH_USERNAME }}"
           git config user.email "${{ secrets.GH_EMAIL }}"
 
-          if git diff --quiet "${{ env.DEFCONFIG_FILE }}"; then
-            echo "ℹ️ No changes detected in defconfig."
+          if git diff --quiet "${{ env.DEFCONFIG_REL_PATH }}"; then
+            echo "No changes detected in defconfig."
             exit 0
           fi
 
-          git add "${{ env.DEFCONFIG_FILE }}"
-          git commit -m "config: [Optimize] Predator HMP — boot-fix A10-A13 + universal RAM 3/32–6/64"
+          git add "${{ env.DEFCONFIG_REL_PATH }}"
+          git commit -m "config: [Optimize] defconfig for ${{ matrix.device }} (${{ matrix.branch }})"
 
-          git remote set-url origin https://x-access-token:${{ secrets.GH_PAT }}@github.com/${{ env.KERNEL_REPO }}.git
+          git remote set-url origin https://x-access-token:${{ secrets.GH_PAT }}@github.com/ExXyrou/android_ps_kernel_xiaomi_lavender.git
 
           MAX_RETRY=5
           for i in $(seq 1 $MAX_RETRY); do
             echo "🔁 Push attempt $i/$MAX_RETRY..."
-            if git push origin HEAD:${{ env.KERNEL_BRANCH }}; then
+            if git push origin HEAD:${{ matrix.branch }}; then
               echo "✅ Push success on attempt $i"
               exit 0
             fi
 
             echo "⚠️ Push rejected, fetching & rebasing..."
-            git fetch origin ${{ env.KERNEL_BRANCH }}
-            git rebase origin/${{ env.KERNEL_BRANCH }} || {
-              echo "❌ Rebase conflict, aborting"
+            git fetch origin ${{ matrix.branch }}
+            git rebase origin/${{ matrix.branch }} || {
+              echo "⚠️ Rebase conflict, aborting"
               git rebase --abort
-              exit 1
+              git pull --rebase -X theirs origin ${{ matrix.branch }}
             }
             sleep 5
           done
@@ -589,7 +149,7 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      - name: Send Telegram Notification (Final Result)
+      - name: Send Telegram Notification
         run: |
           RESULT="${{ needs.optimize-defconfig.result }}"
 
@@ -603,8 +163,7 @@ jobs:
             ICON="❓"
           fi
 
-          MESSAGE=$(printf '%s <b>Predator HMP Defconfig Optimization</b>\n\n📱 <b>Kernel:</b> <code>Predator Stormbreaker 10.0 (HMP 4.4)</code>\n📦 <b>Repo:</b> <code>android_ps_kernel_xiaomi_lavender</code>\n🌿 <b>Branch:</b> <code>oldcam</code>\n⚙️ <b>Defconfig:</b> <code>lavender-perf_defconfig</code>\n\n💾 <b>RAM/Storage:</b> <code>Universal 3/32 · 4/64 · 4/128 · 6/64</code>\n🤖 <b>Android:</b> <code>A10 – A13 Universal</code>\n🔧 <b>Fix:</b> <code>Boot-to-fastboot after bootanimation</code>\n🎯 <b>Scheduler:</b> <code>HMP + Core Control</code>\n📊 <b>Result:</b> <code>%s</code>' \
-            "$ICON" "$RESULT")
+          MESSAGE=$(printf '%s <b>San Kernel Defconfig Optimization</b>\n\n📱 <b>Device:</b> <code>lavender</code>\n🌿 <b>Target:</b> <code>HMP 4.4 (oldcam)</code>\n⚙️ <b>Status:</b> <code>%s</code>\n🔧 <b>Tweaks:</b> <code>HZ=1000, Schedutil/Perf, No Auto Localversion</code>' "$ICON" "$RESULT")
 
           curl -s -X POST "https://api.telegram.org/bot${{ env.BOT_API }}/sendMessage" \
             -F chat_id="${{ env.TELEGRAM_GROUP_ID }}" \
