@@ -1,0 +1,94 @@
+name: 🔍 Repository Search & Finder
+
+on:
+  workflow_dispatch:
+    inputs:
+      search_mode:
+        description: 'Pilih Mode Pencarian'
+        required: true
+        default: 'file'
+        type: choice
+        options:
+          - text
+          - file
+      query_string:
+        description: 'Masukkan Nama File atau Text yang Dicari'
+        required: true
+        type: string
+
+env:
+  KERNEL_DIR: repo_source
+  BOT_API: 8659587120:AAEEQZ1aD5SkUXoUQJYBXhOA7dinaUcLuJA
+  TELEGRAM_GROUP_ID: -1004324974450
+  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+
+jobs:
+  search-repo:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        device: [lavender]
+        branch: [oldcam]
+
+    steps:
+      - name: Initialize Workflow
+        run: |
+          echo "Starting search for '${{ inputs.query_string }}' (Mode: ${{ inputs.search_mode }}) on branch ${{ matrix.branch }}..."
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          repository: ExXyrou/android_ps_kernel_xiaomi_lavender
+          ref: ${{ matrix.branch }}
+          path: ${{ env.KERNEL_DIR }}
+          fetch-depth: 1
+
+      - name: Execute Search
+        working-directory: ${{ env.KERNEL_DIR }}
+        run: |
+          MODE="${{ inputs.search_mode }}"
+          QUERY="${{ inputs.query_string }}"
+          OUTPUT_FILE="../search_result.txt"
+
+          echo "========================================" > "$OUTPUT_FILE"
+          echo " REPOSITORY SEARCH RESULTS" >> "$OUTPUT_FILE"
+          echo "========================================" >> "$OUTPUT_FILE"
+          echo "Repository : ExXyrou/android_ps_kernel_xiaomi_lavender" >> "$OUTPUT_FILE"
+          echo "Branch     : ${{ matrix.branch }}" >> "$OUTPUT_FILE"
+          echo "Mode       : $MODE" >> "$OUTPUT_FILE"
+          echo "Query      : $QUERY" >> "$OUTPUT_FILE"
+          echo "----------------------------------------" >> "$OUTPUT_FILE"
+          echo "" >> "$OUTPUT_FILE"
+
+          if [ "$MODE" == "file" ]; then
+            echo "🔍 Searching for files matching: *$QUERY*"
+            find . -name "*$QUERY*" | sed 's|^\./||' >> "$OUTPUT_FILE"
+          else
+            echo "🔍 Searching for text containing: $QUERY"
+            grep -rnI --exclude-dir=.git "$QUERY" . >> "$OUTPUT_FILE" || echo "No matches found for text: $QUERY" >> "$OUTPUT_FILE"
+          fi
+
+          echo "" >> "$OUTPUT_FILE"
+          echo "----------------------------------------" >> "$OUTPUT_FILE"
+          echo "Search completed successfully." >> "$OUTPUT_FILE"
+
+      - name: Upload Result to Telegram
+        if: always()
+        run: |
+          RESULT_FILE="search_result.txt"
+          
+          if [ -f "$RESULT_FILE" ]; then
+            CAPTION="🔍 <b>Repository Search Report</b>%0A📱 <b>Device:</b> <code>${{ matrix.device }}</code>%0A🌿 <b>Branch:</b> <code>${{ matrix.branch }}</code>%0A⚙️ <b>Mode:</b> <code>${{ inputs.search_mode }}</code>%0A🔎 <b>Query:</b> <code>${{ inputs.query_string }}</code>"
+
+            curl -s -X POST "https://api.telegram.org/bot${{ env.BOT_API }}/sendDocument" \
+              -F chat_id="${{ env.TELEGRAM_GROUP_ID }}" \
+              -F message_thread_id="345" \
+              -F document=@"$RESULT_FILE" \
+              -F caption="$CAPTION" \
+              -F parse_mode="HTML"
+          else
+            echo "⚠️ Result file not found!"
+          fi
