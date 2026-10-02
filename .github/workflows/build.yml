@@ -228,7 +228,7 @@ jobs:
           CAM_TYPE=$([ "${{ inputs.BUILD_NEWCAM }}" == "true" ] && echo "newcam" || echo "oldcam")
 
           if [ "${{ inputs.INJECT_KSU }}" == "true" ]; then
-            KSU_TEXT='<code>enabled</code>'
+            KSU_TEXT='<code>xxksu</code>'
           else
             KSU_TEXT='<code>none</code>'
           fi
